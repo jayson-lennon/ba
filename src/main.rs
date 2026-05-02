@@ -32,11 +32,11 @@ enum Status {
 
 impl std::fmt::Display for Status {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Status::Open => write!(f, "open"),
-            Status::InProgress => write!(f, "in_progress"),
-            Status::Closed => write!(f, "closed"),
-        }
+        f.pad(match self {
+            Status::Open => "open",
+            Status::InProgress => "in_progress",
+            Status::Closed => "closed",
+        })
     }
 }
 
@@ -64,15 +64,15 @@ enum IssueType {
 
 impl std::fmt::Display for IssueType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            IssueType::Task => write!(f, "task"),
-            IssueType::Bug => write!(f, "bug"),
-            IssueType::Feature => write!(f, "feature"),
-            IssueType::Epic => write!(f, "epic"),
-            IssueType::Chore => write!(f, "chore"),
-            IssueType::Refactor => write!(f, "refactor"),
-            IssueType::Legacy => write!(f, "legacy"),
-        }
+        f.pad(match self {
+            IssueType::Task => "task",
+            IssueType::Bug => "bug",
+            IssueType::Feature => "feature",
+            IssueType::Epic => "epic",
+            IssueType::Chore => "chore",
+            IssueType::Refactor => "refactor",
+            IssueType::Legacy => "legacy",
+        })
     }
 }
 
