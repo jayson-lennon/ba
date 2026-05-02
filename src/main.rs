@@ -48,39 +48,30 @@ impl std::fmt::Display for Status {
 // - refactor: improving existing code (no new behavior)
 // - spike: research/investigation (may not produce code)
 // Legacy types (bug, feature, chore) deserialize to Task for backwards compat.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, clap::ValueEnum)]
 #[serde(rename_all = "snake_case")]
 enum IssueType {
-    Epic,
-    Refactor,
-    Spike,
-    #[serde(other)]
+    Bug,
+    Feature,
     Task,
+    Epic,
+    Chore,
+    Refactor,
+    #[serde(other)]
+    #[value(hide = true)]
+    Legacy,
 }
 
 impl std::fmt::Display for IssueType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             IssueType::Task => write!(f, "task"),
+            IssueType::Bug => write!(f, "bug"),
+            IssueType::Feature => write!(f, "feature"),
             IssueType::Epic => write!(f, "epic"),
+            IssueType::Chore => write!(f, "chore"),
             IssueType::Refactor => write!(f, "refactor"),
-            IssueType::Spike => write!(f, "spike"),
-        }
-    }
-}
-
-impl std::str::FromStr for IssueType {
-    type Err = String;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
-            "task" => Ok(IssueType::Task),
-            "epic" => Ok(IssueType::Epic),
-            "refactor" => Ok(IssueType::Refactor),
-            "spike" => Ok(IssueType::Spike),
-            _ => Err(format!(
-                "Unknown issue type: {} (valid: task, epic, refactor, spike)",
-                s
-            )),
+            IssueType::Legacy => write!(f, "legacy"),
         }
     }
 }
@@ -491,9 +482,8 @@ enum Commands {
         /// Issue title
         title: String,
 
-        /// Issue type (bug, feature, task, epic, chore, refactor, spike)
         #[arg(short = 't', long, default_value = "task")]
-        issue_type: String,
+        issue_type: IssueType,
 
         /// Priority (0-4, 0 = highest)
         #[arg(short, long, default_value = "2")]
@@ -694,13 +684,11 @@ fn cmd_init(ac_dir: &Path) -> Result<(), String> {
 fn cmd_create(
     store: &mut Store,
     title: String,
-    issue_type: String,
+    issue_type: IssueType,
     priority: u8,
     description: String,
     json_output: bool,
 ) -> Result<(), String> {
-    let issue_type: IssueType = issue_type.parse()?;
-
     if priority > 4 {
         return Err("Priority must be 0-4".to_string());
     }
@@ -794,12 +782,22 @@ fn cmd_list(
         );
     }
 
-    let open = issues.iter().filter(|i| i.status == Status::Open).count();
-    let in_progress = issues
-        .iter()
+    // Count from the full store, not the filtered list
+    let open = store
+        .issues
+        .values()
+        .filter(|i| i.status == Status::Open)
+        .count();
+    let in_progress = store
+        .issues
+        .values()
         .filter(|i| i.status == Status::InProgress)
         .count();
-    let closed = issues.iter().filter(|i| i.status == Status::Closed).count();
+    let closed = store
+        .issues
+        .values()
+        .filter(|i| i.status == Status::Closed)
+        .count();
 
     println!();
     println!(
@@ -1651,17 +1649,22 @@ fn cmd_import(
             }
         };
 
-        // Parse issue_type (unknown types map to task)
-        let issue_type: IssueType = match beads.issue_type.parse() {
-            Ok(t) => t,
-            Err(_) => {
+        // Parse issue_type (unknown types map to legacy)
+        let issue_type: IssueType = match beads.issue_type.as_str() {
+            "bug" => IssueType::Bug,
+            "feature" => IssueType::Feature,
+            "task" => IssueType::Task,
+            "epic" => IssueType::Epic,
+            "chore" => IssueType::Chore,
+            "refactor" => IssueType::Refactor,
+            _ => {
                 errors.push(ImportError {
                     line_num,
                     issue_id: Some(beads.id.clone()),
                     field: "issue_type".to_string(),
-                    message: format!("Unknown type '{}' mapped to 'task'", beads.issue_type),
+                    message: format!("Unknown type '{}' mapped to 'legacy'", beads.issue_type),
                 });
-                IssueType::Task
+                IssueType::Legacy
             }
         };
 
